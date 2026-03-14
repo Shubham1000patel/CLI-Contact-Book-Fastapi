@@ -5,8 +5,32 @@ from fastapi import FastAPI, HTTPException
 
 app = FastAPI()
 
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+import sqlite3
+
+app = FastAPI()
+
+# --- ADD THIS NEW BLOCK ---
+def init_db():
+    conn = sqlite3.connect("contact_master.db")
+    cursor = conn.cursor()
+    # Create the table ONLY if it doesn't already exist
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS contacts (
+            name TEXT,
+            number TEXT
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+# Run the setup function immediately when the server boots
+init_db()
+
 # 1. Define the "Shape" of the incoming data using Pydantic
 # This tells FastAPI: "Only accept requests that look exactly like this."
+
 class NewContact(BaseModel):
     name: str
     phone: str
