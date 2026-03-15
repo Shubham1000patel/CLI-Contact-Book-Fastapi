@@ -2,3 +2,4 @@
 __pycache__/
 *.pyc
 contact_master.db
+salary_model.pkl

@@ -1,15 +1,18 @@
+import joblib
 from fastapi import FastAPI
 from pydantic import BaseModel
 import sqlite3
 from fastapi import FastAPI, HTTPException
 
-app = FastAPI()
-
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-import sqlite3
 
 app = FastAPI()
+
+
+
+
+print("Loading Custom Salary Model...")
+salary_model = joblib.load("salary_model.pkl")
+print("Salary Model Loaded Successfully!")
 
 # --- ADD THIS NEW BLOCK ---
 def init_db():
@@ -38,6 +41,9 @@ class NewContact(BaseModel):
 class UpdateContact(BaseModel):    
     
     new_phone: str
+
+class EmployeeData(BaseModel):
+    department: str # Expecting "HR", "IT", or "Sales"    
 @app.get("/contacts")
 def get_all_ccontacts():
 
@@ -120,3 +126,33 @@ def update_contact(name: str, update: UpdateContact):
         conn.commit()
         conn.close()
         return {"status": "success", "message": f"Contact '{clean_name}' updated with new phone number."}
+    
+@app.post("/predict_salary")
+def predict_salary(data: EmployeeData):
+    # 1. Standardize the input (handle lowercase/uppercase variations)
+    dept = data.department.upper()
+    
+    # 2. The Translation Layer (String -> One-Hot Encoded Matrix)
+    # The model strictly expects: [HR, IT, Sales]
+    if dept == "HR":
+        features = [[1, 0, 0]]
+    elif dept == "IT":
+        features = [[0, 1, 0]]
+    elif dept == "SALES":
+        features = [[0, 0, 1]]
+    else:
+        # If the user sends "Marketing", the model will crash because it wasn't trained on it.
+        # We must block invalid data before it hits the AI.
+        raise HTTPException(status_code=400, detail="Department must be HR, IT, or Sales")
+
+    # 3. Feed the matrix into the serialized ML model
+    prediction = salary_model.predict(features)
+    
+    # 4. Clean up the output (prediction looks like [52500.0])
+    final_salary = round(prediction[0], 2)
+    
+    # 5. Return the response
+    return {
+        "department": dept,
+        "predicted_salary_inr": final_salary
+    }    
