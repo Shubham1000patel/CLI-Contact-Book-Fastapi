@@ -1,8 +1,15 @@
+from torchvision import transforms
+from vision_model import VisionBrain # Imports the blueprint from your other file
+from PIL import ImageOps
 import joblib
 from fastapi import FastAPI
 from pydantic import BaseModel
 import sqlite3
 from fastapi import FastAPI, HTTPException
+from fastapi import File, UploadFile
+from PIL import Image
+import io
+import torch
 
 
 app = FastAPI()
@@ -155,4 +162,60 @@ def predict_salary(data: EmployeeData):
     return {
         "department": dept,
         "predicted_salary_inr": final_salary
-    }    
+    }   
+    # --- DEEP LEARNING VISION SETUP ---
+print("Loading Deep Learning Vision Model...")
+
+# 1. Build the empty brain
+vision_model = VisionBrain()
+
+# 2. Pour the learned weights into the brain
+vision_model.load_state_dict(torch.load("vision_weights.pth"))
+
+# 3. Lock the brain (Evaluation Mode - Critical for production)
+vision_model.eval()
+print("Vision Model Loaded Successfully!")
+
+# 4. The Image Translation Layer
+# This forces any uploaded image to become a 28x28 grayscale Tensor
+vision_transform = transforms.Compose([
+    transforms.Grayscale(num_output_channels=1),
+    transforms.Resize((28, 28)),
+    transforms.ToTensor()
+])
+
+fashion_dictionary = [
+    "T-shirt/top", "Trouser", "Pullover", "Dress", "Coat",
+    "Sandal", "Shirt", "Sneaker", "Bag", "Ankle boot"
+]
+
+
+@app.post("/predict_vision")
+async def predict_vision(file: UploadFile = File(...)):
+    # 1. Read the physical image file sent by the user
+    image_bytes = await file.read()
+    image = Image.open(io.BytesIO(image_bytes))
+
+    # --- THE INVERSION FIX ---
+    # Convert the image to pure grayscale first
+    image = image.convert("L")
+    # Invert the colors (White background becomes Black, Dark shirt becomes Light!)
+    image = ImageOps.invert(image)
+    
+    # 2. Translate the image into a mathematical Tensor
+    # .unsqueeze(0) adds a fake "batch" dimension so the shape becomes [1, 1, 28, 28]
+    input_tensor = vision_transform(image).unsqueeze(0)
+    
+    # 3. Feed the Tensor to the AI
+    with torch.no_grad():
+        prediction_logits = vision_model(input_tensor)
+        predicted_index = prediction_logits.argmax(1).item()
+        
+    # 4. Translate the math back to English
+    predicted_clothing = fashion_dictionary[predicted_index]
+    
+    return {
+        "filename": file.filename,
+        "ai_prediction": predicted_clothing,
+        "confidence_note": "Model trained to 83.7% accuracy"
+    }
