@@ -219,3 +219,16 @@ async def predict_vision(file: UploadFile = File(...)):
         "ai_prediction": predicted_clothing,
         "confidence_note": "Model trained to 83.7% accuracy"
     }
+
+
+import os
+import uvicorn
+
+# ... (all your existing endpoint code stays above this) ...
+
+# 5. The Production Network Binding
+if __name__ == "__main__":
+    # Render provides a dynamic port in the environment, defaulting to 10000 if not found
+    port = int(os.environ.get("PORT", 10000))
+    print(f"Starting server on port {port}...")
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
