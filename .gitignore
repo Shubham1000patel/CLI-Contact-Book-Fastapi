@@ -7,3 +7,5 @@ vision_weights.pth
 data/
 vision_weights.pth
 *.pth
+datasets/
+*.pt
