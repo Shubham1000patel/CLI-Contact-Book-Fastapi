@@ -5,3 +5,5 @@ contact_master.db
 salary_model.pkl
 vision_weights.pth
 data/
+vision_weights.pth
+*.pth
